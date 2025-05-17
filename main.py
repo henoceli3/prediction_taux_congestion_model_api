@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List
 import joblib
@@ -8,20 +9,30 @@ model = joblib.load("model/model.joblib")
 colonnes_attendues = joblib.load("model/columns.joblib")
 
 class InputData(BaseModel):
-    heure: int
-    jour_semaine: str
-    type_jour: str
+    commune: str
     meteo: str
     evenement: str
-    nb_voitures: int
-    commune: str
+    chantier: str
+    type_jour: str
+    affluence: int
+    heure_num: int
     latitude: float
     longitude: float
+    date_timestamp: int
 
 class BatchInputData(BaseModel):
     items: List[InputData]
 
 app = FastAPI()
+
+# Configuration CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Autorise toutes les origines
+    allow_credentials=True,
+    allow_methods=["*"],  # Autorise toutes les méthodes
+    allow_headers=["*"],  # Autorise tous les headers
+)
 
 @app.get("/")
 def root():
@@ -37,6 +48,8 @@ def predict(data: InputData):
 
 @app.post("/predict_batch")
 def predict_batch(data: BatchInputData):
+    if not data.items:
+        return {"taux_congestions": []}
     input_dfs = [pd.DataFrame([item.dict()]) for item in data.items]
     input_df = pd.concat(input_dfs, ignore_index=True)
     input_encoded = pd.get_dummies(input_df)
